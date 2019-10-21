@@ -29,16 +29,19 @@ class CreateUser(graphene.Mutation):
     class Arguments:
         contact = graphene.String()
         password = graphene.String()
+        first_name = graphene.String()
+        last_name = graphene.String()
     ok = graphene.Boolean()
     user = graphene.Field(UserType)
 
     @staticmethod
-    def mutate(root, info, contact, password):
+    def mutate(root, info, contact, password, first_name, last_name):
         try:
             user = User.objects.get_by_natural_key(contact)
             return CreateUser(ok=False, user=None)
         except User.DoesNotExist:
-            user = User.objects.create_user(dict(contact=contact, password=password))
+            user = User.objects.create_user(dict(contact=contact, password=password, first_name=first_name,
+                                                 last_name=last_name))
             return CreateUser(ok=True, user=user)
 
 
