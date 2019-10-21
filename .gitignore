@@ -1,0 +1,10 @@
+bin
+lib
+lib64
+include
+pyvenv.cfg
+share
+.bashrc
+
+.idea
+__pycache__/
