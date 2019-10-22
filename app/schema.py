@@ -1,7 +1,9 @@
 import graphene
 from graphene_django.types import DjangoObjectType, ObjectType
+from django.contrib.auth import authenticate
 
 from .models import User
+from .decorators import login_required
 
 
 class UserType(DjangoObjectType):
@@ -11,8 +13,9 @@ class UserType(DjangoObjectType):
 
 class Query(ObjectType):
     user = graphene.Field(UserType, contact=graphene.String())
-    users = graphene.List(UserType)
+    login_user = graphene.Field(UserType, contact=graphene.String(), password=graphene.String())
 
+    @login_required
     def resolve_user(self, info, **kwargs):
         contact = kwargs.get('contact')
         try:
@@ -21,8 +24,14 @@ class Query(ObjectType):
         except User.DoesNotExist:
             return None
 
-    def resolve_users(self, info, **kwargs):
-        return User.objects.all()
+    def resolve_login_user(self, info, **kwargs):
+        contact = kwargs.get('contact')
+        password = kwargs.get('password')
+        user = authenticate(username=contact, password=password)
+        if user:
+            info.context.user = user
+            return user
+        return None
 
 
 class CreateUser(graphene.Mutation):
