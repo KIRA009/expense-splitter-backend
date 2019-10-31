@@ -3,8 +3,8 @@ from .utils import make_hash
 
 
 class CustomMiddleware(common.CommonMiddleware):
-    def process_request(self, request):
-        return super().process_request(request)
+    # def process_request(self, request):
+    #     return super().process_request(request)
 
     def process_response(self, request, response):
         response = super().process_response(request, response)

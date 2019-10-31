@@ -4,6 +4,7 @@ from django.contrib.auth import authenticate
 
 from .models import User
 from .decorators import login_required
+from .utils import make_hash
 
 
 class UserType(DjangoObjectType):
@@ -13,7 +14,6 @@ class UserType(DjangoObjectType):
 
 class Query(ObjectType):
     user = graphene.Field(UserType, contact=graphene.String())
-    login_user = graphene.Field(UserType, contact=graphene.String(), password=graphene.String())
 
     @login_required
     def resolve_user(self, info, **kwargs):
@@ -23,15 +23,6 @@ class Query(ObjectType):
             return user
         except User.DoesNotExist:
             return None
-
-    def resolve_login_user(self, info, **kwargs):
-        contact = kwargs.get('contact')
-        password = kwargs.get('password')
-        user = authenticate(username=contact, password=password)
-        if user:
-            info.context.user = user
-            return user
-        return None
 
 
 class CreateUser(graphene.Mutation):
@@ -54,8 +45,24 @@ class CreateUser(graphene.Mutation):
             return CreateUser(ok=True, user=user)
 
 
+class LoginUser(graphene.Mutation):
+    class Arguments:
+        contact = graphene.String()
+        password = graphene.String()
+    logged_in = graphene.Boolean()
+    token = graphene.String()
+
+    @staticmethod
+    def mutate(root, info, contact, password):
+        user = authenticate(username=contact, password=password)
+        if not user:
+            return LoginUser(logged_in=False, token=None)
+        return LoginUser(logged_in=True, token=make_hash(user))
+
+
 class Mutation(graphene.ObjectType):
     create_user = CreateUser.Field()
+    login_user = LoginUser.Field()
 
 
 schema = graphene.Schema(query=Query, mutation=Mutation)
