@@ -64,7 +64,7 @@ class Friend(models.Model):
             to_user=current_user).delete()
 
         return relation
-
+ 
     def save(self, *args, **kwargs):
         # Ensure users can't be friends with themselves
         if self.current_user == self.friend:
