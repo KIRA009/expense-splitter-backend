@@ -1,6 +1,5 @@
 from django.contrib.auth.models import AbstractBaseUser
 from django.db import models
-from django.contrib.auth.models import User
 from django.utils import timezone
 
 from .managers import UserManager
@@ -31,7 +30,6 @@ class FriendRequest(models.Model):
         related_name="user_received",
     )
 
-    message = models.TextField(blank=True)
     created = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
@@ -54,4 +52,4 @@ class Friend(models.Model):
         # Ensure users can't be friends with themselves
         if self.current_user == self.friend:
             raise ValidationError("Users cannot be friends with themselves.")
-        super(Partner, self).save(*args, **kwargs)
+        super(Friend, self).save(*args, **kwargs)
