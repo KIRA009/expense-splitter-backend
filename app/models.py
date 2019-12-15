@@ -30,7 +30,6 @@ class FriendRequest(models.Model):
         related_name="user_received",
     )
 
-    message = models.TextField(blank=True)
     created = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
