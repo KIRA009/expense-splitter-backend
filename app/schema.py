@@ -27,13 +27,8 @@ class Query(ObjectType):
     friend_request = graphene.Field(FriendRequestType, contact_receiver=graphene.String())
 
     @login_required
-    def resolve_user(parent, info, **kwargs):
-        contact = kwargs.get('contact')
-        try:
-            user = User.objects.get_by_natural_key(username=contact)
-            return user
-        except User.DoesNotExist:
-            return None
+    def resolve_user(self, info, **kwargs):
+        return info.context.user
 
     @login_required
     def resolve_friend_request(parent, info, **kwargs):

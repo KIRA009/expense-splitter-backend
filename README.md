@@ -8,7 +8,7 @@ These instructions are aimed for users of all OS, but if it lacks something or y
 - Install the requirements  
   
    `pip3 install requirements.txt`  
-- Have a pgsql database ready, with whatever name you want  
+- Have a mysql or pgsql database ready, with whatever name you want  
 - Set environment variables  
      
    - For linux users  

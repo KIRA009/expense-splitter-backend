@@ -21,7 +21,5 @@ def check_hash(token):
         if not User.objects.get_by_natural_key(data['user']):
             return False, 'No user found with this number'
         return True, User.objects.get_by_natural_key(data['user'])
-    except SignatureExpired:
-        return False, 'Token expired. Please log in again'
     except Exception as e:
-        return False, str(e)
+        return False, None
