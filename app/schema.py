@@ -17,12 +17,7 @@ class Query(ObjectType):
 
     @login_required
     def resolve_user(self, info, **kwargs):
-        contact = kwargs.get('contact')
-        try:
-            user = User.objects.get_by_natural_key(username=contact)
-            return user
-        except User.DoesNotExist:
-            return None
+        return info.context.user
 
 
 class CreateUser(graphene.Mutation):
