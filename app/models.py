@@ -46,10 +46,28 @@ class Friend(models.Model):
     created = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        return f"{self.current_user.username} and {self.friend.username}"
+        return f"{self.current_user.username} is friends with {self.friend.username}"
 
+    @staticmethod
+    def accept(current_user, friend):
+        relation = Friend.objects.create(
+            current_user = current_user,
+            friend = friend
+            )
+        rev_relation = Friend.objects.create(
+            current_user = friend,
+            friend = current_user
+            )
+
+        FriendRequest.objects.filter(
+            from_user=friend,
+            to_user=current_user).delete()
+
+        return relation
+ 
     def save(self, *args, **kwargs):
         # Ensure users can't be friends with themselves
         if self.current_user == self.friend:
             raise ValidationError("Users cannot be friends with themselves.")
+
         super(Friend, self).save(*args, **kwargs)
