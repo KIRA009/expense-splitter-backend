@@ -69,5 +69,5 @@ class Friend(models.Model):
         # Ensure users can't be friends with themselves
         if self.current_user == self.friend:
             raise ValidationError("Users cannot be friends with themselves.")
-
+            
         super(Friend, self).save(*args, **kwargs)
