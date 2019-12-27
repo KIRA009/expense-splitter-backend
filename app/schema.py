@@ -24,17 +24,21 @@ class FriendType(DjangoObjectType):
 
 class Query(ObjectType):
     user = graphene.Field(UserType, contact=graphene.String())
-    friend_request = graphene.Field(FriendRequestType, contact_receiver=graphene.String())
+    friend_requests_sent = graphene.List(FriendRequestType)
+    friend_requests_received = graphene.List(FriendRequestType)
+    friends = graphene.List(FriendType)
 
     @login_required
     def resolve_user(self, info, **kwargs):
         return info.context.user
 
     @login_required
-    def resolve_friend_requests(parent, info, **kwargs):
-        sent = [ fr_req for fr_req in FriendRequest.objects.filter(from_user=info.context.user) ]
-        received = [ fr_req for fr_req in FriendRequest.objects.filter(to_user=info.context.user) ]
-        return {"sent": sent, "received": received}
+    def resolve_friend_requests_sent(parent, info, **kwargs):
+        return [ fr_req for fr_req in FriendRequest.objects.filter(from_user=info.context.user) ]
+    
+    @login_required
+    def resolve_friend_requests_received(parent, info, **kwargs):
+        return [ fr_req for fr_req in FriendRequest.objects.filter(to_user=info.context.user) ]
 
     @login_required
     def resolve_friends(parent, info, **kwargs):
@@ -91,17 +95,17 @@ class SendFriendRequest(graphene.Mutation):
             user_receiver = User.objects.get_by_natural_key(contact_receiver)
 
         except User.DoesNotExist:
-            return SendFriendRequest(message="Error: user not found", ok=False, user_receiver=None, friend_request=None)
+            return SendFriendRequest(message="user not found", ok=False, user_receiver=None, friend_request=None)
 
         try:
             friend_request = FriendRequest.objects.get(from_user=info.context.user, to_user=user_receiver)
             return SendFriendRequest(message="A friend request has already been sent", ok=False, user_receiver=user_receiver, friend_request=None)
 
         except FriendRequest.DoesNotExist:
-            if FriendRequest.objects.get(from_user=user_receiver, to_user=info.context.user).exists()
+            if FriendRequest.objects.filter(from_user=user_receiver, to_user=info.context.user).exists():
                 return SendFriendRequest(message="User has sent a request before", ok=False, user_receiver=user_receiver, friend_request=None)
 
-            if Friend.objects.filter(current_user=info.context.user, friend=user_receiver).exists()
+            if Friend.objects.filter(current_user=info.context.user, friend=user_receiver).exists():
                 return SendFriendRequest(message="Both users are already friends", ok=False, user_receiver=user_receiver, friend_request=None)
             
             friend_request = FriendRequest.objects.create(from_user=info.context.user, to_user=user_receiver)
