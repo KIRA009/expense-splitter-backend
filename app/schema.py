@@ -33,16 +33,16 @@ class Query(ObjectType):
         return info.context.user
 
     @login_required
-    def resolve_friend_requests_sent(parent, info, **kwargs):
-        return [ fr_req for fr_req in FriendRequest.objects.filter(from_user=info.context.user) ]
+    def resolve_friend_requests_sent(self, info, **kwargs):
+        return FriendRequest.objects.filter(from_user=info.context.user)
     
     @login_required
-    def resolve_friend_requests_received(parent, info, **kwargs):
-        return [ fr_req for fr_req in FriendRequest.objects.filter(to_user=info.context.user) ]
+    def resolve_friend_requests_received(self, info, **kwargs):
+        return FriendRequest.objects.filter(to_user=info.context.user)
 
     @login_required
-    def resolve_friends(parent, info, **kwargs):
-        return [ fr for fr in Friend.objects.filter(current_user=info.context.user) ]
+    def resolve_friends(self, info, **kwargs):
+        return Friend.objects.filter(current_user=info.context.user)
 
 
 class CreateUser(graphene.Mutation):
@@ -93,6 +93,8 @@ class SendFriendRequest(graphene.Mutation):
     def mutate(root, info, contact_receiver):
         try:
             user_receiver = User.objects.get_by_natural_key(contact_receiver)
+            if user_receiver == info.context.user:
+                return SendFriendRequest(message="Users can't send request to themselves", ok=False, user_receiver=user_receiver, friend_request=None)
 
         except User.DoesNotExist:
             return SendFriendRequest(message="user not found", ok=False, user_receiver=None, friend_request=None)
@@ -141,26 +143,37 @@ class AcceptFriendRequest(graphene.Mutation):
 class DeleteFriendRequest(graphene.Mutation):
     class Arguments:
         contact_sender = graphene.String()
+        contact_receiver = graphene.String()
     ok = graphene.Boolean()
     user_sender = graphene.Field(UserType)
+    user_receiver = graphene.Field(UserType)
     friend_request = graphene.Field(FriendRequestType)
 
     @staticmethod
     @login_required
-    def mutate(root, info, contact_sender):
+    def mutate(root, info, contact_sender, contact_receiver):
         try:
             user_sender = User.objects.get_by_natural_key(contact_sender)
 
         except User.DoesNotExist:
-            return DeleteFriendRequest(ok=False, user_sender=None, friend_request=None)
+            return DeleteFriendRequest(ok=False, user_sender=None, user_receiver=None, friend_request=None)
 
         try:
-            friend_request = FriendRequest.objects.get(from_user=user_sender, to_user=info.context.user)
+            user_receiver = User.objects.get_by_natural_key(contact_receiver)
+            # ensuring that no other users can exploit as loggedin user should either be a receiver or a sender
+            if user_receiver != info.context.user and user_sender != info.context.user:
+                return DeleteFriendRequest(ok=False, user_sender=user_sender, user_receiver=user_receiver, friend_request=None)
+
+        except User.DoesNotExist:
+            return DeleteFriendRequest(ok=False, user_sender=user_sender, user_receiver=None, friend_request=None)
+
+        try:
+            friend_request = FriendRequest.objects.get(from_user=user_sender, to_user=user_receiver)
             friend_request.delete()
-            return DeleteFriendRequest(ok=True, user_sender=user_sender, friend_request=friend_request)
+            return DeleteFriendRequest(ok=True, user_sender=user_sender, user_receiver=user_receiver, friend_request=friend_request)
 
         except FriendRequest.DoesNotExist:
-            return DeleteFriendRequest(ok=False, user_sender=user_sender, friend_request=None)
+            return DeleteFriendRequest(ok=False, user_sender=user_sender, user_receiver=user_receiver, friend_request=None)
 
 
 class Mutation(graphene.ObjectType):
