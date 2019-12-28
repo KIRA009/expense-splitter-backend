@@ -1,6 +1,7 @@
 import graphene
 from graphene_django.types import DjangoObjectType, ObjectType
 from django.contrib.auth import authenticate
+from django.db.models import Q
 
 from .models import User, FriendRequest, Friend
 from .decorators import login_required
@@ -142,38 +143,26 @@ class AcceptFriendRequest(graphene.Mutation):
 
 class DeleteFriendRequest(graphene.Mutation):
     class Arguments:
-        contact_sender = graphene.String()
-        contact_receiver = graphene.String()
+        other_user = graphene.String()
     ok = graphene.Boolean()
-    user_sender = graphene.Field(UserType)
-    user_receiver = graphene.Field(UserType)
+    other_user = graphene.Field(UserType)
     friend_request = graphene.Field(FriendRequestType)
 
     @staticmethod
     @login_required
-    def mutate(root, info, contact_sender, contact_receiver):
+    def mutate(root, info, other_user):
         try:
-            user_sender = User.objects.get_by_natural_key(contact_sender)
-
+            other_user = User.objects.get_by_natural_key(other_user)
         except User.DoesNotExist:
-            return DeleteFriendRequest(ok=False, user_sender=None, user_receiver=None, friend_request=None)
+            return DeleteFriendRequest(ok=False, other_user=None, friend_request=None)
 
         try:
-            user_receiver = User.objects.get_by_natural_key(contact_receiver)
-            # ensuring that no other users can exploit as loggedin user should either be a receiver or a sender
-            if user_receiver != info.context.user and user_sender != info.context.user:
-                return DeleteFriendRequest(ok=False, user_sender=user_sender, user_receiver=user_receiver, friend_request=None)
-
-        except User.DoesNotExist:
-            return DeleteFriendRequest(ok=False, user_sender=user_sender, user_receiver=None, friend_request=None)
-
-        try:
-            friend_request = FriendRequest.objects.get(from_user=user_sender, to_user=user_receiver)
+            friend_request = FriendRequest.objects.get(Q(from_user=info.context.user, to_user=other_user) | Q(
+                from_user=other_user, to_user=info.context.user))
             friend_request.delete()
-            return DeleteFriendRequest(ok=True, user_sender=user_sender, user_receiver=user_receiver, friend_request=friend_request)
-
+            return DeleteFriendRequest(ok=True, other_user=other_user, friend_request=friend_request)
         except FriendRequest.DoesNotExist:
-            return DeleteFriendRequest(ok=False, user_sender=user_sender, user_receiver=user_receiver, friend_request=None)
+            return DeleteFriendRequest(ok=False, other_user=other_user, friend_request=None)
 
 
 class Mutation(graphene.ObjectType):
