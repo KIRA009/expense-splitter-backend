@@ -3,7 +3,7 @@ from graphene_django.types import DjangoObjectType, ObjectType
 from django.contrib.auth import authenticate
 from django.db.models import Q
 
-from .models import User, FriendRequest, Friend, Group, Member
+from .models import User, FriendRequest, Friend, Group
 from .decorators import login_required
 from .utils import make_hash
 
@@ -26,11 +26,6 @@ class FriendType(DjangoObjectType):
 class GroupType(DjangoObjectType):
     class Meta:
         model = Group
-
-
-class MemberType(DjangoObjectType):
-    class Meta:
-        model = Member        
 
 
 class Query(ObjectType):
@@ -58,10 +53,10 @@ class Query(ObjectType):
 
     @login_required
     def resolve_groups(self, info, **kwargs):
-        if Member.objects.filter(user=info.context.user).exists():
-            return Group.objects.filter(group_admin=info.context.user) | Group.objects.filter(group_member=Member.objects.get(user=info.context.user))
-        else:
-            return Group.objects.filter(group_admin=info.context.user)
+        return Group.objects.filter(
+            Q(group_admin=info.context.user) | Q(group_member=info.context.user)
+        )
+        
 
 class CreateUser(graphene.Mutation):
     class Arguments:
@@ -185,56 +180,58 @@ class DeleteFriendRequest(graphene.Mutation):
 class CreateGroup(graphene.Mutation):
     class Arguments:
         group_name = graphene.String()
-        contacts_list = graphene.List(graphene.String)
+        contacts = graphene.List(graphene.String)
     message = graphene.String()
     ok = graphene.Boolean()
     group = graphene.Field(GroupType)
 
     @staticmethod
     @login_required
-    def mutate(root, info, group_name, contacts_list):
+    def mutate(root, info, group_name, contacts):
         try:
             group = Group.objects.get(group_name=group_name, group_admin=info.context.user)
             return CreateGroup(ok=False, message="A group with the same name already exists", group=None)
         except Group.DoesNotExist:
             # to remove duplicate contacts
-            contacts_list = list(set(contacts_list))
-            friends_contacts_list = [ str(fri_obj.friend.contact) for fri_obj in Friend.objects.filter(current_user=info.context.user) ]
-            for contact in contacts_list:
-                if contact not in friends_contacts_list:
-                    return CreateGroup(ok=False, message="Some contacts are not of your friends'", group=None)
+            contacts = set(contacts)
+            friends_contacts = set([ str(fri_obj.friend.contact) for fri_obj in Friend.objects.filter(current_user=info.context.user) ])
+            if len(contacts - friends_contacts):
+                return CreateGroup(ok=False, message="Some contacts are not of your friends'", group=None)
             # create group with the members(selected friends)
             group = Group.objects.create(group_name=group_name, group_admin=info.context.user)
-            for contact in contacts_list:
-                member, created = Member.objects.get_or_create(user=User.objects.get(contact=contact))
-                group.group_member.add(member.id)
+            users = User.objects.filter(contact__in=contacts)
+            ThroughModel = Group.group_member.through
+            ThroughModel.objects.bulk_create([ 
+                ThroughModel(user_id=user.pk, group_id=group.pk) for user in users
+            ])
             return CreateGroup(ok=True, message="Group created successfully", group=group)
 
 
 class AddMembers(graphene.Mutation):
     class Arguments:
         group_name = graphene.String()
-        contacts_list = graphene.List(graphene.String)
+        contacts = graphene.List(graphene.String)
     message = graphene.String()
     ok = graphene.Boolean()
     group = graphene.Field(GroupType)
 
     @staticmethod
     @login_required
-    def mutate(root, info, group_name, contacts_list):
+    def mutate(root, info, group_name, contacts):
         try:
             # to remove duplicate contacts
-            contacts_list = list(set(contacts_list))
-            friends_contacts_list = [ str(fri_obj.friend.contact) for fri_obj in Friend.objects.filter(current_user=info.context.user) ]
-            for contact in contacts_list:
-                if contact not in friends_contacts_list:
-                    return AddMembers(ok=False, message="Some contacts are not of your friends'", group=None)
+            contacts = set(contacts)
+            friends_contacts = set( [ str(fri_obj.friend.contact) for fri_obj in Friend.objects.filter(current_user=info.context.user) ] )
+            if len(contacts - friends_contacts):
+                return AddMembers(ok=False, message="Some contacts are not of your friends'", group=None)
             group = Group.objects.get(group_name=group_name, group_admin=info.context.user)
-            members_list = [ member_obj.user.contact for member_obj in group.group_member.all() ]
-            for contact in contacts_list:
-                if contact not in members_list:
-                    member, created = Member.objects.get_or_create(user=User.objects.get(contact=contact))
-                    group.group_member.add(member.id)
+            members = set( [ member.contact for member in group.group_member.all() ] )
+            contacts = contacts - members
+            users = User.objects.filter(contact__in=contacts)
+            ThroughModel = Group.group_member.through
+            ThroughModel.objects.bulk_create([ 
+                ThroughModel(user_id=user.pk, group_id=group.pk) for user in users
+            ])                    
             return AddMembers(ok=True, message="Successfully added new members", group=group)
         except Group.DoesNotExist:
             return AddMembers(ok=False, message="Group doesn't exist", group=None)
@@ -243,23 +240,23 @@ class AddMembers(graphene.Mutation):
 class RemoveMembers(graphene.Mutation):
     class Arguments:
         group_name = graphene.String()
-        contacts_list = graphene.List(graphene.String)
+        contacts = graphene.List(graphene.String)
     message = graphene.String()
     ok = graphene.Boolean()
     group = graphene.Field(GroupType)
 
     @staticmethod
     @login_required
-    def mutate(root, info, group_name, contacts_list):
+    def mutate(root, info, group_name, contacts):
         try:
             # to remove duplicate contacts
-            contacts_list = list(set(contacts_list))
+            contacts = set(contacts)
             group = Group.objects.get(group_name=group_name, group_admin=info.context.user)
-            members_list = [ member_obj.user.contact for member_obj in group.group_member.all() ]
-            for contact in contacts_list:
-                if contact in members_list:
-                    group.group_member.remove(Member.objects.get(user=User.objects.get(contact=contact)))
-            return RemoveMembers(ok=True, message="Successfully removed", group=group)
+            members = set( [ member.contact for member in group.group_member.all() ] )
+            contacts = contacts.intersection(members)
+            users = User.objects.filter(contact__in=contacts)
+            group.group_member.remove(*( user for user in users)) 
+            return RemoveMembers(ok=True, message="Successfully removed existing members out of these", group=group)
         except Group.DoesNotExist:
             return RemoveMembers(ok=False, message="Group doesn't exist", group=None)
 

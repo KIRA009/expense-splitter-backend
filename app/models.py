@@ -73,17 +73,10 @@ class Friend(models.Model):
         super(Friend, self).save(*args, **kwargs)
 
 
-class Member(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="member")
-
-    def __str__(self):
-        return self.user.contact
-
-
 class Group(models.Model):
     group_name = models.CharField(max_length=15)
     group_admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name="group_admin")
-    group_member = models.ManyToManyField(Member, related_name="group_member")
+    group_member = models.ManyToManyField(User, related_name="group_member")
 
     def __str__(self):
         return f"{self.group_admin.contact}'s {self.group_name}"
