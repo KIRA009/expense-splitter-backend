@@ -2,6 +2,7 @@ import graphene
 from graphene_django.types import DjangoObjectType, ObjectType
 from django.contrib.auth import authenticate
 from django.db.models import Q
+from django.db import connection
 
 from .models import User, FriendRequest, Friend, Group
 from .decorators import login_required
@@ -194,16 +195,12 @@ class CreateGroup(graphene.Mutation):
         except Group.DoesNotExist:
             # to remove duplicate contacts
             contacts = set(contacts)
-            friends_contacts = set([ str(fri_obj.friend.contact) for fri_obj in Friend.objects.filter(current_user=info.context.user) ])
-            if len(contacts - friends_contacts):
+            friends = info.context.user.user.filter(friend__contact__in=contacts).values_list('pk', flat=True)
+            if len(friends) != len(contacts):
                 return CreateGroup(ok=False, message="Some contacts are not of your friends'", group=None)
             # create group with the members(selected friends)
             group = Group.objects.create(group_name=group_name, group_admin=info.context.user)
-            users = User.objects.filter(contact__in=contacts)
-            ThroughModel = Group.group_member.through
-            ThroughModel.objects.bulk_create([ 
-                ThroughModel(user_id=user.pk, group_id=group.pk) for user in users
-            ])
+            group.group_member.add(*friends)
             return CreateGroup(ok=True, message="Group created successfully", group=group)
 
 
@@ -221,17 +218,14 @@ class AddMembers(graphene.Mutation):
         try:
             # to remove duplicate contacts
             contacts = set(contacts)
-            friends_contacts = set( [ str(fri_obj.friend.contact) for fri_obj in Friend.objects.filter(current_user=info.context.user) ] )
-            if len(contacts - friends_contacts):
+            friends = info.context.user.user.filter(friend__contact__in=contacts).values_list('pk', flat=True)
+            if len(friends) != len(contacts):
                 return AddMembers(ok=False, message="Some contacts are not of your friends'", group=None)
-            group = Group.objects.get(group_name=group_name, group_admin=info.context.user)
-            members = set( [ member.contact for member in group.group_member.all() ] )
-            contacts = contacts - members
-            users = User.objects.filter(contact__in=contacts)
-            ThroughModel = Group.group_member.through
-            ThroughModel.objects.bulk_create([ 
-                ThroughModel(user_id=user.pk, group_id=group.pk) for user in users
-            ])                    
+            try:
+                group = Group.objects.get(group_name=group_name, group_admin=info.context.user)
+            except Group.DoesNotExist:
+                return AddMembers(ok=False, message="Group doesn't exist", group=None)
+            group.group_member.add(*friends)
             return AddMembers(ok=True, message="Successfully added new members", group=group)
         except Group.DoesNotExist:
             return AddMembers(ok=False, message="Group doesn't exist", group=None)
@@ -252,10 +246,8 @@ class RemoveMembers(graphene.Mutation):
             # to remove duplicate contacts
             contacts = set(contacts)
             group = Group.objects.get(group_name=group_name, group_admin=info.context.user)
-            members = set( [ member.contact for member in group.group_member.all() ] )
-            contacts = contacts.intersection(members)
-            users = User.objects.filter(contact__in=contacts)
-            group.group_member.remove(*( user for user in users)) 
+            friends = info.context.user.user.filter(friend__contact__in=contacts).values_list('pk', flat=True)
+            group.group_member.remove(*friends)
             return RemoveMembers(ok=True, message="Successfully removed existing members out of these", group=group)
         except Group.DoesNotExist:
             return RemoveMembers(ok=False, message="Group doesn't exist", group=None)

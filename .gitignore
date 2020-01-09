@@ -8,3 +8,5 @@ share
 
 .idea
 __pycache__/
+
+app/migrations

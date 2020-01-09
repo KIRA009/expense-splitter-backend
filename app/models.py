@@ -37,12 +37,12 @@ class FriendRequest(models.Model):
 
 
 class Friend(models.Model):
-    current_user = models.ForeignKey(User, 
-        on_delete=models.CASCADE, 
-        related_name="user")
-    friend = models.ForeignKey(User, 
-        on_delete=models.CASCADE, 
-        related_name="friend")
+    current_user = models.ForeignKey(User,
+                                     on_delete=models.CASCADE,
+                                     related_name="user")
+    friend = models.ForeignKey(User,
+                               on_delete=models.CASCADE,
+                               related_name="friend")
     created = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
@@ -51,20 +51,20 @@ class Friend(models.Model):
     @staticmethod
     def accept(current_user, friend):
         relation = Friend.objects.create(
-            current_user = current_user,
-            friend = friend
-            )
+            current_user=current_user,
+            friend=friend
+        )
         rev_relation = Friend.objects.create(
-            current_user = friend,
-            friend = current_user
-            )
+            current_user=friend,
+            friend=current_user
+        )
 
         FriendRequest.objects.filter(
             from_user=friend,
             to_user=current_user).delete()
 
         return relation
- 
+
     def save(self, *args, **kwargs):
         # Ensure users can't be friends with themselves
         if self.current_user == self.friend:
