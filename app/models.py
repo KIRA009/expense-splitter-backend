@@ -1,11 +1,11 @@
-from django.contrib.auth.models import AbstractBaseUser
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils import timezone
 
 from .managers import UserManager
 
 
-class User(AbstractBaseUser):
+class User(AbstractBaseUser, PermissionsMixin):
     contact = models.CharField(max_length=10, unique=True)
     is_staff = models.BooleanField(default=False)
     first_name = models.CharField(max_length=256, default='First Name')
@@ -33,7 +33,7 @@ class FriendRequest(models.Model):
     created = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        return f"{self.from_user.username} to {self.to_user.username}"
+        return f"{self.from_user.contact} to {self.to_user.contact}"
 
 
 class Friend(models.Model):
@@ -46,7 +46,7 @@ class Friend(models.Model):
     created = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        return f"{self.current_user.username} is friends with {self.friend.username}"
+        return f"{self.current_user.contact} is friends with {self.friend.contact}"
 
     @staticmethod
     def accept(current_user, friend):
@@ -71,3 +71,12 @@ class Friend(models.Model):
             raise ValidationError("Users cannot be friends with themselves.")
 
         super(Friend, self).save(*args, **kwargs)
+
+
+class Group(models.Model):
+    group_name = models.CharField(max_length=15)
+    group_admin = models.ForeignKey(User, on_delete=models.CASCADE, related_name="group_admin")
+    group_member = models.ManyToManyField(User, related_name="group_member")
+
+    def __str__(self):
+        return f"{self.group_admin.contact}'s {self.group_name}"
