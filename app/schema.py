@@ -2,6 +2,7 @@ import graphene
 from graphene_django.types import DjangoObjectType, ObjectType
 from django.contrib.auth import authenticate
 from django.db.models import Q
+import time
 from django.db import connection
 
 from .models import User, FriendRequest, Friend, Group
@@ -31,32 +32,10 @@ class GroupType(DjangoObjectType):
 
 class Query(ObjectType):
     user = graphene.Field(UserType, contact=graphene.String())
-    friend_requests_sent = graphene.List(FriendRequestType)
-    friend_requests_received = graphene.List(FriendRequestType)
-    friends = graphene.List(FriendType)
-    groups = graphene.List(GroupType)
 
     @login_required
     def resolve_user(self, info, **kwargs):
         return info.context.user
-
-    @login_required
-    def resolve_friend_requests_sent(self, info, **kwargs):
-        return FriendRequest.objects.filter(from_user=info.context.user)
-    
-    @login_required
-    def resolve_friend_requests_received(self, info, **kwargs):
-        return FriendRequest.objects.filter(to_user=info.context.user)
-
-    @login_required
-    def resolve_friends(self, info, **kwargs):
-        return Friend.objects.filter(current_user=info.context.user)
-
-    @login_required
-    def resolve_groups(self, info, **kwargs):
-        return Group.objects.filter(
-            Q(group_admin=info.context.user) | Q(group_member=info.context.user)
-        )
         
 
 class CreateUser(graphene.Mutation):
@@ -111,7 +90,7 @@ class SendFriendRequest(graphene.Mutation):
                 return SendFriendRequest(message="Users can't send request to themselves", ok=False, user_receiver=user_receiver, friend_request=None)
 
         except User.DoesNotExist:
-            return SendFriendRequest(message="user not found", ok=False, user_receiver=None, friend_request=None)
+            return SendFriendRequest(message="User not found", ok=False, user_receiver=None, friend_request=None)
 
         try:
             friend_request = FriendRequest.objects.get(from_user=info.context.user, to_user=user_receiver)
