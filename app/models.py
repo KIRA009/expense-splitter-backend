@@ -80,3 +80,22 @@ class Group(models.Model):
 
     def __str__(self):
         return f"{self.group_admin.contact}'s {self.group_name}"
+
+
+class Payment(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    time_of_initation = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.contact} at {self.time_of_initation}"
+
+
+class PaymentHolder(models.Model):
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE)
+    users = models.ManyToManyField(User, related_name="payment_users")
+    amount_each_owes = models.IntegerField()
+    paid = models.BooleanField(default=False)
+    payment_datetime = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.amount_each_owes} per person"
