@@ -91,11 +91,12 @@ class Payment(models.Model):
 
 
 class PaymentHolder(models.Model):
-    payment = models.ForeignKey(Payment, on_delete=models.CASCADE)
-    users = models.ManyToManyField(User, related_name="payment_users")
-    amount_each_owes = models.IntegerField()
+    payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name="payment_holders")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payment_user")
+    amount_owed = models.IntegerField()
     paid = models.BooleanField(default=False)
-    payment_datetime = models.DateTimeField(auto_now_add=True)
+    payment_datetime = models.DateTimeField(default=None)
+    created = models.DateField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.amount_each_owes} per person"
+        return f"{self.user.contact} owes {self.amount_owed}"
