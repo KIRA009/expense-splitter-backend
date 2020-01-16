@@ -32,10 +32,19 @@ class GroupType(DjangoObjectType):
 
 class Query(ObjectType):
     user = graphene.Field(UserType, contact=graphene.String())
+    not_added_members = graphene.List(UserType, group_name=graphene.String())
 
     @login_required
     def resolve_user(self, info, **kwargs):
         return info.context.user
+
+    @login_required
+    def resolve_not_added_members(self, info, **kwargs):
+        try:
+            group = Group.objects.get(group_name=kwargs['group_name'], group_admin=info.context.user)
+            return [friend.friend for friend in info.context.user.user.exclude(friend__in=group.group_member.all()).all()]
+        except Group.DoesNotExist:
+            return [None]
         
 
 class CreateUser(graphene.Mutation):
