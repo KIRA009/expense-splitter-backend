@@ -187,7 +187,7 @@ class CreateGroup(graphene.Mutation):
         except Group.DoesNotExist:
             # to remove duplicate contacts
             contacts = set(contacts)
-            friends = info.context.user.user.filter(friend__contact__in=contacts).values_list('pk', flat=True)
+            friends = info.context.user.user.filter(friend__contact__in=contacts).values_list('friend__pk', flat=True)
             if len(friends) != len(contacts):
                 return CreateGroup(ok=False, message="Some contacts are not of your friends'", group=None)
             # create group with the members(selected friends)
@@ -210,7 +210,7 @@ class AddMembers(graphene.Mutation):
         try:
             # to remove duplicate contacts
             contacts = set(contacts)
-            friends = info.context.user.user.filter(friend__contact__in=contacts).values_list('pk', flat=True)
+            friends = info.context.user.user.filter(friend__contact__in=contacts).values_list('friend__pk', flat=True)
             if len(friends) != len(contacts):
                 return AddMembers(ok=False, message="Some contacts are not of your friends'", group=None)
             try:
@@ -238,7 +238,7 @@ class RemoveMembers(graphene.Mutation):
             # to remove duplicate contacts
             contacts = set(contacts)
             group = Group.objects.get(group_name=group_name, group_admin=info.context.user)
-            friends = info.context.user.user.filter(friend__contact__in=contacts).values_list('pk', flat=True)
+            friends = info.context.user.user.filter(friend__contact__in=contacts).values_list('friend__pk', flat=True)
             group.group_member.remove(*friends)
             return RemoveMembers(ok=True, message="Successfully removed existing members out of these", group=group)
         except Group.DoesNotExist:
