@@ -5,9 +5,12 @@ from django.db.models import Q
 import time
 from django.db import connection
 
-from .models import User, FriendRequest, Friend, Group
+from .models import User, FriendRequest, Friend, Group, Payment, PaymentHolder
 from .decorators import login_required
 from .utils import make_hash
+
+from paytm import Checksum
+from paytm.payments import PaytmPaymentPage
 
 
 class UserType(DjangoObjectType):
@@ -28,6 +31,16 @@ class FriendType(DjangoObjectType):
 class GroupType(DjangoObjectType):
     class Meta:
         model = Group
+
+
+class PaymentType(DjangoObjectType):
+    class Meta:
+        model = Payment
+
+
+class PaymentHolderType(DjangoObjectType):
+    class Meta:
+        model = PaymentHolder
 
 
 class Query(ObjectType):
@@ -232,6 +245,61 @@ class RemoveMembers(graphene.Mutation):
             return RemoveMembers(ok=False, message="Group doesn't exist", group=None)
 
 
+class PaymentInputKeyValueType(graphene.InputObjectType):
+    contact = graphene.String(required=True)
+    amount_owed = graphene.Int(required=True)
+
+
+class InitiatePayment(graphene.Mutation):
+    class Arguments:
+        payment_objects = graphene.List(PaymentInputKeyValueType)
+    message = graphene.String()
+    ok = graphene.Boolean()
+
+    @staticmethod
+    def mutate(root, info, payment_objects):
+        contacts = [ p_obj['contact'] for p_obj in payment_objects ]
+        if len(contacts) > len(set(contacts)):
+            return InitiatePayment(ok=False, message="Duplicate contacts detected with same or different amount")
+        users = User.objects.filter(contact__in=contacts)
+        if len(users) != len(contacts):
+            return InitiatePayment(ok=False, message="Some contacts do not exist")
+        payments = [ Payment(user=user) for user in users ]        
+        Payment.objects.bulk_create(
+                payments
+            )
+        PaymentHolder.objects.bulk_create(
+            [ PaymentHolder(payment_id=payment.id, user=user, amount_owed=p_obj['amount_owed']) for payment, user, p_obj in zip(payments, users, payment_objects) ]
+            ) 
+        return InitiatePayment(ok=True, message="Created Successfully")
+
+
+class InitiateOwedPayment(graphene.Mutation):
+    class Arguments:
+        payment_id = graphene.Int()
+    html = graphene.String()
+    ok = graphene.Boolean()
+
+    @staticmethod
+    def mutate(root, info, payment_id):
+        try:
+            payment_holder = PaymentHolder.objects.get(payment_id=payment_id)
+            order_id = Checksum.__id_generator__()
+            payment_holder.paytm_order_id = order_id
+            payment_holder.save()
+            bill_amount = str(payment_holder.amount_owed)
+            cust_id = payment_holder.user.contact
+            data_dict = {
+                        'ORDER_ID':order_id,
+                        'TXN_AMOUNT': bill_amount,
+                        'CUST_ID': cust_id,
+                    }
+            html =  PaytmPaymentPage(data_dict)
+            return InitiateOwedPayment(ok=True, html=html)
+        except PaymentHolder.DoesNotExist:
+            return InitiateOwedPayment(ok=False, html=None)
+
+
 class Mutation(graphene.ObjectType):
     create_user = CreateUser.Field()
     login_user = LoginUser.Field()
@@ -241,6 +309,8 @@ class Mutation(graphene.ObjectType):
     create_group = CreateGroup.Field()
     add_members = AddMembers.Field()
     remove_members = RemoveMembers.Field()
+    initiate_payment = InitiatePayment.Field()
+    initiate_owed_payment = InitiateOwedPayment.Field()
 
 
 schema = graphene.Schema(query=Query, mutation=Mutation)
