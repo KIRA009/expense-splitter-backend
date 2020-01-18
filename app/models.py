@@ -94,10 +94,10 @@ class PaymentHolder(models.Model):
     payment = models.ForeignKey(Payment, on_delete=models.CASCADE, related_name="payment_holders")
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payment_user")
     amount_owed = models.IntegerField()
-    paid = models.BooleanField(default=False)
-    payment_datetime = models.DateTimeField(default=None, null=True)
-    created = models.DateField(auto_now_add=True)
-    paytm_order_id = models.CharField(max_length=6, null=True)
+    paid = models.BooleanField(default=False) # updated to True if payment is successful
+    payment_datetime = models.DateTimeField(default=None, null=True) # generated if payment is successfull
+    created = models.DateField(auto_now_add=True) # generated when an object of PaymentHolder is created
+    paytm_order_id = models.CharField(max_length=6, null=True) # generated during paytm payment for proper tracking and future reference
 
     def __str__(self):
         return f"{self.user.contact} owes {self.amount_owed}"
