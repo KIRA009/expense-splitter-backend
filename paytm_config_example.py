@@ -1,0 +1,21 @@
+PAYTM_MERCHANT_COMPANY_NAME = "Test Company"
+PAYTM_CHANNEL_ID = "WEB"
+PAYTM_EMAIL  = "mailtous@company.com"
+PAYTM_MOBILE = "9999999999"
+PAYTM_STAGING = True
+if PAYTM_STAGING:
+    PAYTM_MERCHANT_KEY = "<enter Merchant Key>"
+    PAYTM_INDUSTRY_TYPE_ID = "Retail"
+    PAYTM_MERCHANT_ID = "<enter Merchant_ID>"
+    PAYTM_CALLBACK_URL = "http://localhost:8000/response/" if settings.DEBUG else "http://www.mywebsite.com/response/"
+    PAYTM_WEBSITE = "WEBSTAGING"
+    PAYTM_TRANSACTION_STATUS_URL = "https://securegw-stage.paytm.in/order/status"
+    PAYTM_PAYMENT_GATEWAY_URL = "https://securegw-stage.paytm.in/order/process"
+else:
+    PAYTM_MERCHANT_KEY = ""
+    PAYTM_INDUSTRY_TYPE_ID = ""
+    PAYTM_MERCHANT_ID = ""
+    PAYTM_CALLBACK_URL = ""
+    PAYTM_WEBSITE = ""
+    PAYTM_TRANSACTION_STATUS_URL = ""
+    PAYTM_PAYMENT_GATEWAY_URL = ""
